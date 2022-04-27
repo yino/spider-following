@@ -1,7 +1,10 @@
 package spider
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 
@@ -45,6 +48,11 @@ func (e *Exec) Run() {
 				colly.MaxDepth(1),
 				colly.Async(true),
 			)
+			f, err := os.OpenFile(fmt.Sprintf("data/%d.txt", i), os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
 			for {
 				log.Println(i)
 				// 获取url地址
@@ -56,7 +64,12 @@ func (e *Exec) Run() {
 					if len(nextHref) > 0 {
 						e.AddQueue(nextHref)
 					}
-					log.Println(users)
+					jsonUser, err := json.Marshal(users)
+					if err != nil {
+						log.Println(fmt.Sprintf("error url %s err %v", url, err))
+					} else {
+						f.Write([]byte(string(jsonUser) + "\n"))
+					}
 				})
 			}
 		}(i)
