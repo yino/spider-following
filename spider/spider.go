@@ -30,16 +30,12 @@ func (e *Exec) AddQueue(url string) error {
 	} else {
 		e.indexQueue++
 	}
-	log.Println(url, e.indexQueue)
 	e.queueChan[e.indexQueue] <- url
-	log.Println("lock complete")
 	return nil
 }
 
 func (e *Exec) Run() {
-	log.Println(e.goNum)
 	for i := 0; i < e.goNum; i++ {
-		log.Println(i)
 		e.wg.Add(1)
 		go func(i int) {
 			c := colly.NewCollector(
@@ -54,16 +50,16 @@ func (e *Exec) Run() {
 			}
 			defer f.Close()
 			for {
-				log.Println(i)
 				// 获取url地址
 				url := <-e.queueChan[i]
-				log.Println(url)
+				log.Println("goroutine no", i, "url", url)
 				c.Visit(url)
 				c.OnResponse(func(response *colly.Response) {
 					users, nextHref := ParseHtml(string(response.Body))
 					if len(nextHref) > 0 {
 						e.AddQueue(nextHref)
 					}
+					log.Println("i", i, "nextHref", nextHref)
 					jsonUser, err := json.Marshal(users)
 					if err != nil {
 						log.Println(fmt.Sprintf("error url %s err %v", url, err))
@@ -72,6 +68,7 @@ func (e *Exec) Run() {
 					}
 				})
 			}
+			e.wg.Done()
 		}(i)
 	}
 	e.wg.Wait()
@@ -95,6 +92,7 @@ func ParseHtml(content string) ([]string, string) {
 	for _, n := range list {
 		if htmlquery.InnerText(n) == "Next" {
 			nextHref = htmlquery.SelectAttr(n, "href")
+			log.Println("nextHref", nextHref)
 		}
 	}
 	userList := htmlquery.Find(htmlquery.Find(htmlquery.Find(doc, `//div[@class="Layout-main"]`)[1], `//div[@class="position-relative"]`)[0], `//a[@class="d-inline-block no-underline mb-1"]`)
